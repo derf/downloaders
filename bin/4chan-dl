@@ -1,0 +1,139 @@
+#!/usr/bin/env perl
+## Copyright © 2008-2009 by Daniel Friesel <derf@derf.homelinux.org>
+## License: WTFPL <http://sam.zoy.org/wtfpl>
+use strict;
+use warnings;
+use Getopt::Std;
+use LWP::Simple;
+
+my $basedir = "$ENV{HOME}/lib/pics/4chan";
+my $thread_url;
+my ($server, $board, $thread);
+my %opts;
+my $number = 0;
+my (@images);
+local $| = 1;
+my $url_re = qr{
+	^ http:// boards \. 4chan \. org
+	/ (?<board> \w+ ) / res / (?<thread> \d+ ) $
+}x;
+
+getopts('b:d:n:', \%opts);
+
+sub print_progress {
+	if (($number % 60) == 0) {
+		if ($number) {
+			printf(" %4d/%d\n", $number, scalar(@images));
+		}
+		printf('[%3d%%] ', $number * 100 / @images);
+	} elsif (($number % 10) == 0) {
+		print ' ';
+	}
+	return;
+}
+
+sub make_dirs {
+	foreach my $dir ("$basedir/$board", "$basedir/$board/$thread") {
+		if (not -d $dir) {
+			mkdir($dir) or die("Cannot create directory $dir: $!");
+		}
+	}
+	return;
+}
+
+sub do_thread {
+	my $url = shift;
+	my $site = get($url) or die("Can't open $url: $!");
+	my $file_re = qr{
+		File \s* :? \s*
+		<a \s href="http:// \w+ \. 4chan \. org
+		/ \w+ / src / (cb-nws/)?
+		(?<image> \d+ (\.png | \.jpg | \.gif) ) "
+	}x;
+	my @return;
+
+	make_dirs;
+
+	while ($site =~ /$file_re/sg) {
+		push(@return, $+{image});
+	}
+
+	return @return;
+}
+
+sub get_image {
+	my $img = shift;
+	my $image;
+
+	if (not -f "$basedir/$board/$thread/$img") {
+
+		open($image, '>', "$basedir/$board/$thread/$img") or die("Cannot open $img: $!");
+		print $image get("http://images.4chan.org/$board/src/$img");
+		close($image) or die("Cannot close $img: $!");
+
+		print '+';
+	} else {
+		print '.';
+	}
+	return;
+}
+
+
+$thread_url = shift;
+
+if ($thread_url !~ $url_re) {
+	die("Cannot parse url '$thread_url'");
+}
+
+$server = $+{server};
+$board = $opts{b} // $+{board};
+$thread = $opts{n} // $+{thread};
+
+if (defined $opts{d}) {
+	$basedir = $opts{d};
+}
+
+@images = do_thread($thread_url);
+
+foreach (@images) {
+	print_progress;
+	get_image($_);
+	$number++;
+}
+
+print "\n";
+
+__END__
+
+=head1 NAME
+
+4chan-dl - Download images from 4chan threads
+
+=head1 SYNOPSIS
+
+B<4chan-dl> [B<-b> I<board>] [B<-n> I<name>] I<thread_url>
+
+=head1 DESCRIPTION
+
+B<4chan-dl> Downloads all images in a thread (designated by I<thread_url>)
+from 4chan.
+They are saved in F<~/lib/pics/4chan/server/board/name>, where board and name
+can be overriden by commandline options
+
+=head1 OPTIONS
+
+=over
+
+=item B<-b> I<board>
+
+Save images in I<board> instead of the board name they are from
+
+=item B<-d> I<directory>
+
+Change base directory
+
+=item B<-n> I<name>
+
+Save images in the directory I<name> instead of the thread number
+
+=back

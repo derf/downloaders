@@ -1,0 +1,98 @@
+#!/usr/bin/env perl
+## Copyright © 2008-2009 by Daniel Friesel <derf@derf.homelinux.org>
+## License: WTFPL <http://sam.zoy.org/wtfpl>
+use strict;
+use warnings;
+use LWP::Simple;
+
+sub do_search {
+	my $search_term = shift;
+	my $start_at = (shift || 0) * 48;
+	my $result = get(
+	  'http://www.deviantart.com/global/difi/?c%5B%5D=%22Resources%22'
+	. '%2C%22htmlFromQuery%22%2C%5B%22meta%3Aall%20boost%3Apopular%20'
+	. $search_term
+	. '%22%2C'
+	. $start_at
+	. '%2C24%2C%22thumb150%22%2C%22category%3A1%2Ctitle%3A1%2C'
+	. 'artist%3A0%2Crelated%3A1%2Cdescription%3A1%2Csitback%3A1%2C'
+	. 'suggest%3A1%2Ccatpath%3A1%22%5D&t=page&ad_frame=atf_right_300x250'
+	. '&ad_zone=right_wr_browse&ad_zone2=BROWSE.v6&ad_d=300x250&ad_keys='
+	. 'Catpath%3A%2C%20Section%3Abrowse&ad_style=thumbnail&'
+	. 'ad_buster=1268075700584&nostat=1&ad_mature=0')
+		or die("Unable to get(): $!");
+
+	return $result;
+}
+
+sub parse_thumbsite {
+	my $html = shift;
+	my @return;
+	my $image_re = qr{
+		\-\-> \s <a \s href=\\" (?<url> \S+ ) \\ "
+		\s class = \\ " t \\ "
+		\s title = \\ " [^"]+ \s by \s (?<user> \S+) , [^"]+ " >
+		(?<title> [^>]+ )
+		< \\ / a >
+	}xo;
+
+	while ($html =~ /$image_re/gs) {
+		push(@return, $+{'url'});
+	}
+
+	return @return;
+}
+
+sub unescape {
+	my $input = shift;
+	$input =~ s/\\\//\//g;
+	return $input;
+}
+
+sub download_image {
+	my $url = shift;
+	my $html = get($url) or die("Cannot get($url): $!");
+	my $image;
+	my $download_re = qr{
+		<a \s id="download-button" \s href=" (?<url> [^"]+ ) ">
+		Download </a>
+	}xo;
+	my $img_re = qr{
+		deviantART\.pageData=\{"fullview":\{"width":"\d+","height":"\d+","src":"
+		(?<escaped_url> [^"]+ ) "\}
+	}xo;
+
+	if ($html =~ /$download_re/s) {
+		$image = $+{url};
+	}
+	elsif ($html =~ /$img_re/s) {
+		$image = unescape($+{escaped_url});
+	}
+	else {
+		warn("Cannot find an image at $url\n");
+		return;
+	}
+
+	my ($filename) = $image =~ m/\/ ([^\/]+) $/x;
+
+	print ">>> $url\n    $filename\n\n";
+
+	open(my $file, '>', $filename) or die("Cannot open $filename: $!\n");
+	print {$file} get($image) or die("Cannot get($image): $!");
+	close($file) or warn("Cannot close $filename: $!\n");
+}
+
+
+foreach my $url (parse_thumbsite(do_search(@ARGV))) {
+	download_image(unescape($url));
+}
+
+__END__
+
+=head1 NAME
+
+dadl - Downlad images from DeviantArt
+
+=head1 SYNOPSIS
+
+dadl I<search term> [I<page>]
