@@ -1,6 +1,0 @@
-#!/bin/sh -e
-
-for f in 4chan-dl dadl; do
-	perl -c bin/${f}
-	podchecker -warnings -warnings bin/${f}
-done
