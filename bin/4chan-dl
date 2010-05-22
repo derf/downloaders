@@ -21,14 +21,12 @@ my $url_re = qr{
 getopts('b:d:n:', \%opts);
 
 sub print_progress {
-	if (($number % 60) == 0) {
-		if ($number) {
-			printf(" %4d/%d\n", $number, scalar(@images));
-		}
-		printf('[%3d%%] ', $number * 100 / @images);
-	} elsif (($number % 10) == 0) {
-		print ' ';
-	}
+	printf(
+		"\r\e[2KDownloading image %d/%d (%d%%)",
+		$number,
+		scalar @images,
+		$number * 100 / @images,
+	);
 	return;
 }
 
@@ -71,9 +69,6 @@ sub get_image {
 		print $image get("http://images.4chan.org/$board/src/$img");
 		close($image) or die("Cannot close $img: $!");
 
-		print '+';
-	} else {
-		print '.';
 	}
 	return;
 }
@@ -96,9 +91,9 @@ if (defined $opts{d}) {
 @images = do_thread($thread_url);
 
 foreach (@images) {
-	print_progress;
-	get_image($_);
 	$number++;
+	print_progress();
+	get_image($_);
 }
 
 print "\n";
