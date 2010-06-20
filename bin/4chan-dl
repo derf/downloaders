@@ -3,8 +3,12 @@
 ## License: WTFPL <http://sam.zoy.org/wtfpl>
 use strict;
 use warnings;
+use 5.010;
+
 use Getopt::Std;
 use LWP::Simple;
+use String::Format;
+use XML::LibXML;
 
 my $basedir = "$ENV{HOME}/lib/pics/4chan";
 my $thread_url;
@@ -12,20 +16,23 @@ my ($server, $board, $thread);
 my %opts;
 my $number = 0;
 my (@images);
+my $html;
+my @fred;
 local $| = 1;
 my $url_re = qr{
 	^ http:// boards \. 4chan \. org
 	/ (?<board> \w+ ) / res / (?<thread> \d+ ) $
 }x;
 
-getopts('b:d:n:', \%opts);
+
+getopts('b:c:d:f:n:t:', \%opts);
 
 sub print_progress {
 	printf(
 		"\r\e[2KDownloading image %d/%d (%d%%)",
 		$number,
-		scalar @images,
-		$number * 100 / @images,
+		scalar @fred,
+		$number * 100 / @fred,
 	);
 	return;
 }
@@ -39,36 +46,24 @@ sub make_dirs {
 	return;
 }
 
-sub do_thread {
-	my $url = shift;
-	my $site = get($url) or die("Can't open $url: $!");
-	my $file_re = qr{
-		File \s* :? \s*
-		<a \s href="http:// \w+ \. 4chan \. org
-		/ \w+ / src / (cb-nws/)?
-		(?<image> \d+ (\.png | \.jpg | \.gif) ) "
-	}x;
-	my @return;
-
-	make_dirs;
-
-	while ($site =~ /$file_re/sg) {
-		push(@return, $+{image});
+sub save_image {
+	my ($img, $name) = @_;
+	if (not -f "$basedir/$board/$thread/$name") {
+		open(my $image, '>', "$basedir/$board/$thread/$name")
+			or die("Cannot open $name: $!");
+		print {$image} get($img);
+		close($image) or die("Cannot close $name: $!");
 	}
-
-	return @return;
+	return;
 }
 
-sub get_image {
-	my $img = shift;
-	my $image;
-
-	if (not -f "$basedir/$board/$thread/$img") {
-
-		open($image, '>', "$basedir/$board/$thread/$img") or die("Cannot open $img: $!");
-		print $image get("http://images.4chan.org/$board/src/$img");
-		close($image) or die("Cannot close $img: $!");
-
+sub save_text {
+	my ($fn, $text) = @_;
+	if (not -f "$basedir/$board/$thread/$fn") {
+		open(my $fh, '>', "$basedir/$board/$thread/$fn")
+			or die("Cannot open $fn: $!");
+		print {$fh} $text;
+		close($fh);
 	}
 	return;
 }
@@ -83,18 +78,100 @@ if ($thread_url !~ $url_re) {
 $server = $+{server};
 $board = $opts{b} // $+{board};
 $thread = $opts{n} // $+{thread};
+my $img_template = $opts{f} // "%f";
+my $comment_template = $opts{c};
+my $text_template = $opts{t} // "%t";
 
 if (defined $opts{d}) {
 	$basedir = $opts{d};
 }
 
-@images = do_thread($thread_url);
+$html = XML::LibXML->load_html(
+	string  => get($thread_url),
+	recover => 2,
+	suppress_errors   => 1,
+	suppress_warnings => 1,
+);
 
-foreach (@images) {
+my $xp_thread = XML::LibXML::XPathExpression->new(
+	'//form[@name="delform"]');
+
+($html) = $html->findnodes($xp_thread);
+
+my $xp_op_img_link = XML::LibXML::XPathExpression->new(
+	'./a'
+);
+my $xp_op_img_name = XML::LibXML::XPathExpression->new(
+	'./span/span'
+);
+my $xp_op_text = XML::LibXML::XPathExpression->new(
+	'./blockquote'
+);
+
+my $xp_replies = XML::LibXML::XPathExpression->new(
+	'//form[@name="delform"]/table/tr/td'
+);
+
+my $xp_r_img_link = XML::LibXML::XPathExpression->new(
+	'./span[@class="filesize"]/a'
+);
+my $xp_r_img_name = $xp_op_img_name;
+my $xp_r_text = $xp_op_text;
+
+push(@fred, [
+	($html->findnodes($xp_op_img_link))[0]->getAttribute('href'),
+	($html->findnodes($xp_op_img_name))[0]->textContent(),
+	($html->findnodes($xp_op_text))[0]->textContent(),
+]);
+
+foreach my $element ($html->findnodes($xp_replies)) {
+	my $n_link = ($element->findnodes($xp_r_img_link))[0];
+	my $n_name = ($element->findnodes($xp_r_img_name))[0];
+	my $n_text = ($element->findnodes($xp_r_text))[0];
+	my ($link, $name, $text);
+
+	next if (not defined $n_text);
+
+	if (defined $n_link) {
+		$link = $n_link->getAttribute('href');
+	}
+	if (defined $n_name) {
+		$name = $n_name->textContent();
+	}
+	if (defined $n_text) {
+		$text = $n_text->textContent();
+	}
+	push(@fred, [$link, $name, $text]);
+}
+
+make_dirs();
+
+for my $i (0 .. $#fred) {
+	my ($url, $name, $text) = @{$fred[$i]};
+	
+	$url //= q{};
+
+	my %format = (
+		'f' => (split(qr{/}, $url))[-1] // q{},
+		'i' => $i,
+		'n' => $name // q{},
+		't' => $text // q{},
+		'u' => $url  // q{},
+	);
+
 	$number++;
 	print_progress();
-	get_image($_);
+	if (length($url)) {
+		save_image($url, stringf($img_template, %format));
+	}
+	if (defined $comment_template) {
+		save_text(
+			stringf($comment_template, %format),
+			stringf($text_template, %format),
+		);
+	}
 }
+
 
 print "\n";
 
