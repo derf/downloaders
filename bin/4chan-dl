@@ -189,23 +189,94 @@ B<4chan-dl> [B<-b> I<board>] [B<-n> I<name>] I<thread_url>
 
 B<4chan-dl> Downloads all images in a thread (designated by I<thread_url>)
 from 4chan.
-They are saved in F<~/lib/pics/4chan/server/board/name>, where board and name
+They are saved in F<~/lib/pics/4chan/board/name>, where board and name
 can be overriden by commandline options
 
 =head1 OPTIONS
 
 =over
 
-=item B<-b> I<board>
+=item B<-b> I<name>
 
-Save images in I<board> instead of the board name they are from
+Save images in board I<name> instead of the board name they are from
+
+=item B<-c> I<comment template>
+
+Save thread comments to the filename specified by I<comment template>.  If
+this is not specified, comments will not be saved
 
 =item B<-d> I<directory>
 
 Change base directory
 
+=item B<-f> I<image template>
+
+Save images to the filename specified by I<image template>.  Default: B<%f>
+
 =item B<-n> I<name>
 
 Save images in the directory I<name> instead of the thread number
 
+=item B<-t> I<text template>
+
+Write text based on I<text template> into the comment files.  Default: B<%t>
+
 =back
+
+=head1 FORMAT SPECIFIERS
+
+The I<template> options accept a printf-like string with the following escape
+codes:
+
+=over
+
+=item B<%f>
+
+Image filename from 4chan, like "1276230223204.jpg"
+
+=item B<%i>
+
+B<4chan-dl> comment ID, starting at B<0>
+
+=item B<%n>
+
+Original image file name.  Note that this may not be unique, it is recommended
+to combine it with B<%i>
+
+=item B<%t>
+
+Full comment text
+
+=item B<%u>
+
+Full image URL
+
+=back
+
+Note that only B<%i> will be set for every comment, the other values may be
+empty if the comment contained either no file or no text.
+
+=head1 EXIT STATUS
+
+0 if the thread was found, non-zero upon any kind of error.
+
+=head1 CONFIGURATION
+
+None.
+
+=head1 DEPENDENCIES
+
+B<4chan-dl> requires the perl modules Getopt::Std, LWP::Simple, String::Format
+and XML::LibXML.
+
+=head1 BUGS AND LIMITATIONS
+
+None found so far.
+
+=head1 AUTHOR
+
+Copyright (C) 2008-2010 by Daniel Friesel <derf@chaosdorf.de>.
+
+=head1 LICENSE
+
+    0. You just DO WHAT THE FUCK YOU WANT TO.
