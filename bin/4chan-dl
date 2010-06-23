@@ -273,6 +273,17 @@ and XML::LibXML.
 
 None found so far.
 
+=head1 EXAMPLES
+
+=over
+
+=item * C<< 4chan-dl -d /tmp -c %f.txt $url >>
+
+Download images and comments to /tmp.  You could now use feh to browse images
+and their comments, like C<< feh -Sfilename --caption-path . /tmp/wg/... >>
+
+=back
+
 =head1 AUTHOR
 
 Copyright (C) 2008-2010 by Daniel Friesel <derf@chaosdorf.de>.
