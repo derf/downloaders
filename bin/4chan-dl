@@ -29,7 +29,7 @@ getopts('b:c:d:f:n:t:', \%opts);
 
 sub print_progress {
 	printf(
-		"\r\e[2KDownloading image %d/%d (%d%%)",
+		"\r\e[2KProcessing comment %d/%d (%d%%)",
 		$number,
 		scalar @fred,
 		$number * 100 / @fred,
