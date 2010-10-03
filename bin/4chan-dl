@@ -15,7 +15,7 @@ my $thread_url;
 my ($server, $board, $thread);
 my %opts;
 my $number = 0;
-my (@images);
+my ($new_comm, $new_img, $all_comm, $all_img) = (0, 0, 0, 0);
 my $html;
 my @fred;
 local $| = 1;
@@ -48,7 +48,9 @@ sub make_dirs {
 
 sub save_image {
 	my ($img, $name) = @_;
+	$all_img++;
 	if (not -f "$basedir/$board/$thread/$name") {
+		$new_img++;
 		open(my $image, '>', "$basedir/$board/$thread/$name")
 			or die("Cannot open $name: $!");
 		print {$image} get($img);
@@ -59,7 +61,9 @@ sub save_image {
 
 sub save_text {
 	my ($fn, $text) = @_;
+	$all_comm++;
 	if (not -f "$basedir/$board/$thread/$fn") {
+		$new_comm++;
 		open(my $fh, '>', "$basedir/$board/$thread/$fn")
 			or die("Cannot open $fn: $!");
 		print {$fh} $text;
@@ -172,7 +176,20 @@ for my $i (0 .. $#fred) {
 	}
 }
 
+printf(
+	"\r\e[2KDone: %d images in %d comments",
+	$all_img,
+	$number,
+);
 
+if (($new_comm and $new_comm != $all_comm)
+		or ($new_img and $new_img != $all_img)) {
+	printf(
+		" (%d/%d new)",
+		$new_img,
+		$new_comm,
+	);
+}
 print "\n";
 
 __END__
