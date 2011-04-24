@@ -157,7 +157,7 @@ for my $i (0 .. $#fred) {
 
 	my %format = (
 		'f' => (split(qr{/}, $url))[-1] // q{},
-		'i' => $i,
+		'i' => sprintf('%03d', $i),
 		'n' => $name // q{},
 		't' => $text // q{},
 		'u' => $url  // q{},
