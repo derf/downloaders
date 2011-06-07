@@ -12,10 +12,10 @@ use XML::LibXML;
 
 my $basedir = "$ENV{HOME}/lib/pics/4chan";
 my $thread_url;
-my ($server, $board, $thread);
+my ( $server, $board, $thread );
 my %opts;
 my $number = 0;
-my ($new_comm, $new_img, $all_comm, $all_img) = (0, 0, 0, 0);
+my ( $new_comm, $new_img, $all_comm, $all_img ) = ( 0, 0, 0, 0 );
 my $html;
 my @fred;
 local $| = 1;
@@ -24,22 +24,19 @@ my $url_re = qr{
 	/ (?<board> \w+ ) / res / (?<thread> \d+ ) $
 }x;
 
-
-getopts('b:c:d:f:n:t:', \%opts);
+getopts( 'b:c:d:f:n:t:', \%opts );
 
 sub print_progress {
 	printf(
 		"\r\e[2KProcessing comment %d/%d (%d%%)",
-		$number,
-		scalar @fred,
-		$number * 100 / @fred,
+		$number, scalar @fred, $number * 100 / @fred,
 	);
 	return;
 }
 
 sub make_dirs {
-	foreach my $dir ("$basedir/$board", "$basedir/$board/$thread") {
-		if (not -d $dir) {
+	foreach my $dir ( "$basedir/$board", "$basedir/$board/$thread" ) {
+		if ( not -d $dir ) {
 			mkdir($dir) or die("Cannot create directory $dir: $!");
 		}
 	}
@@ -47,12 +44,12 @@ sub make_dirs {
 }
 
 sub save_image {
-	my ($img, $name) = @_;
+	my ( $img, $name ) = @_;
 	$all_img++;
-	if (not -f "$basedir/$board/$thread/$name") {
+	if ( not -f "$basedir/$board/$thread/$name" ) {
 		$new_img++;
-		open(my $image, '>', "$basedir/$board/$thread/$name")
-			or die("Cannot open $name: $!");
+		open( my $image, '>', "$basedir/$board/$thread/$name" )
+		  or die("Cannot open $name: $!");
 		print {$image} get($img);
 		close($image) or die("Cannot close $name: $!");
 	}
@@ -60,104 +57,97 @@ sub save_image {
 }
 
 sub save_text {
-	my ($fn, $text) = @_;
+	my ( $fn, $text ) = @_;
 	$all_comm++;
-	if (not -f "$basedir/$board/$thread/$fn") {
+	if ( not -f "$basedir/$board/$thread/$fn" ) {
 		$new_comm++;
-		open(my $fh, '>', "$basedir/$board/$thread/$fn")
-			or die("Cannot open $fn: $!");
+		open( my $fh, '>', "$basedir/$board/$thread/$fn" )
+		  or die("Cannot open $fn: $!");
 		print {$fh} $text;
 		close($fh);
 	}
 	return;
 }
 
-
 $thread_url = shift;
 
-if ($thread_url !~ $url_re) {
+if ( $thread_url !~ $url_re ) {
 	die("Cannot parse url '$thread_url'");
 }
 
 $server = $+{server};
-$board = $opts{b} // $+{board};
+$board  = $opts{b} // $+{board};
 $thread = $opts{n} // $+{thread};
-my $img_template = $opts{f} // "%f";
+my $img_template     = $opts{f} // "%f";
 my $comment_template = $opts{c};
-my $text_template = $opts{t} // "%t";
+my $text_template    = $opts{t} // "%t";
 
-if (defined $opts{d}) {
+if ( defined $opts{d} ) {
 	$basedir = $opts{d};
 }
 
 $html = XML::LibXML->load_html(
-	string  => get($thread_url),
-	recover => 2,
+	string            => get($thread_url),
+	recover           => 2,
 	suppress_errors   => 1,
 	suppress_warnings => 1,
 );
 
-my $xp_thread = XML::LibXML::XPathExpression->new(
-	'//form[@name="delform"]');
+my $xp_thread = XML::LibXML::XPathExpression->new('//form[@name="delform"]');
 
 ($html) = $html->findnodes($xp_thread);
 
-my $xp_op_img_link = XML::LibXML::XPathExpression->new(
-	'./a'
-);
-my $xp_op_img_name = XML::LibXML::XPathExpression->new(
-	'./span/span'
-);
-my $xp_op_text = XML::LibXML::XPathExpression->new(
-	'./blockquote'
-);
+my $xp_op_img_link = XML::LibXML::XPathExpression->new('./a');
+my $xp_op_img_name = XML::LibXML::XPathExpression->new('./span/span');
+my $xp_op_text     = XML::LibXML::XPathExpression->new('./blockquote');
 
-my $xp_replies = XML::LibXML::XPathExpression->new(
-	'//form[@name="delform"]/table/tr/td'
-);
+my $xp_replies
+  = XML::LibXML::XPathExpression->new('//form[@name="delform"]/table/tr/td');
 
-my $xp_r_img_link = XML::LibXML::XPathExpression->new(
-	'./span[@class="filesize"]/a'
-);
+my $xp_r_img_link
+  = XML::LibXML::XPathExpression->new('./span[@class="filesize"]/a');
 my $xp_r_img_name = $xp_op_img_name;
-my $xp_r_text = $xp_op_text;
+my $xp_r_text     = $xp_op_text;
 
-push(@fred, [
-	($html->findnodes($xp_op_img_link))[0]->getAttribute('href'),
-	($html->findnodes($xp_op_img_name))[0]->textContent(),
-	($html->findnodes($xp_op_text))[0]->textContent(),
-]);
+push(
+	@fred,
+	[
+		( $html->findnodes($xp_op_img_link) )[0]->getAttribute('href'),
+		( $html->findnodes($xp_op_img_name) )[0]->textContent(),
+		( $html->findnodes($xp_op_text) )[0]->textContent(),
+	]
+);
 
-foreach my $element ($html->findnodes($xp_replies)) {
-	my $n_link = ($element->findnodes($xp_r_img_link))[0];
-	my $n_name = ($element->findnodes($xp_r_img_name))[0];
-	my $n_text = ($element->findnodes($xp_r_text))[0];
-	my ($link, $name, $text);
+foreach my $element ( $html->findnodes($xp_replies) ) {
+	my $n_link = ( $element->findnodes($xp_r_img_link) )[0];
+	my $n_name = ( $element->findnodes($xp_r_img_name) )[0];
+	my $n_text = ( $element->findnodes($xp_r_text) )[0];
+	my ( $link, $name, $text );
 
-	next if (not defined $n_text);
+	next if ( not defined $n_text );
 
-	if (defined $n_link) {
+	if ( defined $n_link ) {
 		$link = $n_link->getAttribute('href');
 	}
-	if (defined $n_name) {
+	if ( defined $n_name ) {
 		$name = $n_name->textContent();
 	}
-	if (defined $n_text) {
+	if ( defined $n_text ) {
 		$text = $n_text->textContent();
 	}
-	push(@fred, [$link, $name, $text]);
+	push( @fred, [ $link, $name, $text ] );
 }
 
 make_dirs();
 
-for my $i (0 .. $#fred) {
-	my ($url, $name, $text) = @{$fred[$i]};
-	
+for my $i ( 0 .. $#fred ) {
+	my ( $url, $name, $text ) = @{ $fred[$i] };
+
 	$url //= q{};
 
 	my %format = (
-		'f' => (split(qr{/}, $url))[-1] // q{},
-		'i' => sprintf('%03d', $i),
+		'f' => ( split( qr{/}, $url ) )[-1] // q{},
+		'i' => sprintf( '%03d', $i ),
 		'n' => $name // q{},
 		't' => $text // q{},
 		'u' => $url  // q{},
@@ -165,30 +155,23 @@ for my $i (0 .. $#fred) {
 
 	$number++;
 	print_progress();
-	if (length($url)) {
-		save_image($url, stringf($img_template, %format));
+	if ( length($url) ) {
+		save_image( $url, stringf( $img_template, %format ) );
 	}
-	if (defined $comment_template) {
+	if ( defined $comment_template ) {
 		save_text(
-			stringf($comment_template, %format),
-			stringf($text_template, %format),
+			stringf( $comment_template, %format ),
+			stringf( $text_template,    %format ),
 		);
 	}
 }
 
-printf(
-	"\r\e[2KDone: %d images in %d comments",
-	$all_img,
-	$number,
-);
+printf( "\r\e[2KDone: %d images in %d comments", $all_img, $number, );
 
-if (($new_comm and $new_comm != $all_comm)
-		or ($new_img and $new_img != $all_img)) {
-	printf(
-		" (%d/%d new)",
-		$new_img,
-		$new_comm,
-	);
+if (   ( $new_comm and $new_comm != $all_comm )
+	or ( $new_img and $new_img != $all_img ) )
+{
+	printf( " (%d/%d new)", $new_img, $new_comm, );
 }
 print "\n";
 
