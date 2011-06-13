@@ -1,0 +1,6 @@
+#!/bin/sh
+## Copyright © 2011 by Daniel Friesel <derf@finalrewind.org>
+## License: WTFPL:
+##   0. You just DO WHAT THE FUCK YOU WANT TO.
+
+while 4chan-dl "$1"; do sleep "${2-5}m"; done
