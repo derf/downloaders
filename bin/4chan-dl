@@ -6,7 +6,7 @@ use warnings;
 use 5.010;
 
 use Getopt::Std;
-use LWP::Simple;
+use LWP::UserAgent;
 use String::Format;
 use XML::LibXML;
 
@@ -23,6 +23,10 @@ my $url_re = qr{
 	^ http:// boards \. 4chan \. org
 	/ (?<board> \w+ ) / res / (?<thread> \d+ ) $
 }x;
+
+my $ua = LWP::UserAgent->new(
+	agent => 'Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.0.1 Iceweasel/7.0.1'
+);
 
 getopts( 'b:c:d:f:n:t:', \%opts );
 
@@ -50,7 +54,7 @@ sub save_image {
 		$new_img++;
 		open( my $image, '>', "$basedir/$board/$thread/$name" )
 		  or die("Cannot open $name: $!");
-		print {$image} get($img);
+		print {$image} $ua->get($img)->content;
 		close($image) or die("Cannot close $name: $!");
 	}
 	return;
@@ -87,7 +91,7 @@ if ( defined $opts{d} ) {
 }
 
 $html = XML::LibXML->load_html(
-	string            => get($thread_url),
+	string            => $ua->get($thread_url)->content,
 	recover           => 2,
 	suppress_errors   => 1,
 	suppress_warnings => 1,
