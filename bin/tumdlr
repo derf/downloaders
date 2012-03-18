@@ -1,0 +1,115 @@
+#!/usr/bin/env perl
+## Copyright © 2012 by Daniel Friesel <derf@derf.homelinux.org>
+## License: WTFPL <http://sam.zoy.org/wtfpl>
+use strict;
+use warnings;
+use 5.010;
+
+use LWP::UserAgent;
+use XML::LibXML;
+
+my ($base_url) = @ARGV;
+my $url = $base_url;
+
+local $| = 1;
+
+my $ua
+  = LWP::UserAgent->new( agent =>
+'Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.0.1 Iceweasel/7.0.1'
+  );
+
+my $xp_post = XML::LibXML::XPathExpression->new(
+	'//div[@class="post" or @class="photo post" or @class="video post"]');
+my $xp_multi = XML::LibXML::XPathExpression->new(
+	'./div[@class="media"]/div/iframe | ./div[@class="html_photoset"]/iframe');
+my $xp_media = XML::LibXML::XPathExpression->new('./div[@class="media"]/a');
+my $xp_next  = XML::LibXML::XPathExpression->new('//div[@id="navigation"]/a');
+my $xp_set
+  = XML::LibXML::XPathExpression->new('//div[@class="photoset"]/div/a');
+
+my $text_cache;
+
+sub stash_text {
+	($text_cache) = @_;
+}
+
+sub crawl_image {
+	my ($url) = @_;
+	my ( $no, $id ) = $url =~ m{ ([^/]+) / ([^/]+) $ }ox;
+	my $name = "${id}_${no}";
+
+	# we're done here
+	if ( -e $name ) {
+		say "no new images at $name";
+		exit 0;
+	}
+
+	say "downloading $name";
+
+	open( my $im, '>', $name ) or die("Cannot open $name: $!\n");
+	print {$im} $ua->get($url)->content;
+	close($im) or die("Cannot close $name: $!\n");
+
+	if ($text_cache) {
+		open( my $txt, '>:encoding(utf-8)', "${id}.txt" )
+		  or die("Cannot open ${id}.txt: $!\n");
+		say {$txt} $text_cache;
+		close($txt) or die("cannot close ${id}.txt: $!\n");
+		$text_cache = undef;
+	}
+}
+
+sub crawl_subpage {
+	my ($url) = @_;
+	my $html = XML::LibXML->load_html(
+		string            => $ua->get($url)->content,
+		recover           => 2,
+		suppress_errors   => 1,
+		suppress_warnings => 1,
+	);
+
+	for my $elem ( $html->findnodes($xp_set) ) {
+		crawl_image( $elem->getAttribute('href') );
+	}
+}
+
+sub crawl_page {
+	my ($url) = @_;
+
+	my $html = XML::LibXML->load_html(
+		string            => $ua->get($url)->content,
+		recover           => 2,
+		suppress_errors   => 1,
+		suppress_warnings => 1,
+	);
+
+	for my $elem ( $html->findnodes($xp_post) ) {
+		my ($n_multi) = $elem->findnodes($xp_multi);
+		my ($n_media) = $elem->findnodes($xp_media);
+
+		$text_cache = $elem->textContent();
+
+		if ($n_multi) {
+			crawl_subpage( $n_multi->getAttribute('src') );
+		}
+		elsif ($n_media) {
+			crawl_image( $n_media->getAttribute('href') );
+		}
+		else {
+		}
+	}
+	for my $elem ( $html->findnodes($xp_next) ) {
+		if (   ( $elem->textContent() =~ m{Next page} )
+			or ( ( $elem->getAttribute('id') // '' ) eq 'nav-next' ) )
+		{
+			say "\tnext page: " . $elem->getAttribute('href');
+			return ( $base_url . $elem->getAttribute('href') );
+		}
+	}
+	return;
+}
+
+# recursive approach didn't work, caused by LibXML?
+while ($url) {
+	$url = crawl_page($url);
+}
