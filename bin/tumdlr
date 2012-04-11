@@ -19,12 +19,12 @@ my $ua
   );
 
 my $xp_post = XML::LibXML::XPathExpression->new(
-	'//div[@class="post" or @class="photo post" or @class="video post" or @class="post "]'
+	'//div[@class="post" or @class="photo post" or @class="video post" or @class="post " or @class="post photo" or @class="post video"]'
 	. ' | //li[@class="post photo" or @class="post photoset"]');
 my $xp_multi = XML::LibXML::XPathExpression->new('.//iframe');
 my $xp_media = XML::LibXML::XPathExpression->new('./div[@class="media" or @id="postmiddle"]/a');
 my $xp_next  = XML::LibXML::XPathExpression->new('//div[@id="navigation" or @id="index"]/a'
-	. ' | //p[@class="previous-next"]/a');
+	. ' | //p[@class="previous-next"]/a | //div[@id="pagenav"]/div/a');
 my $xp_set
   = XML::LibXML::XPathExpression->new('//div[@class="photoset"]/div/a');
 
@@ -100,7 +100,7 @@ sub crawl_page {
 		}
 	}
 	for my $elem ( $html->findnodes($xp_next) ) {
-		if (   ( $elem->textContent() =~ m{Next page|Older|Previous } )
+		if (   ( $elem->textContent() =~ m{Next page|Older|Previous |Wander back} )
 			or ( ( $elem->getAttribute('id') // '' ) eq 'nav-next' ) )
 		{
 			say "\tnext page: " . $elem->getAttribute('href');
