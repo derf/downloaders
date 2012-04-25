@@ -5,6 +5,9 @@ use strict;
 use warnings;
 use 5.010;
 
+use Digest::SHA qw(sha512);
+use File::Slurp qw(read_dir read_file write_file);
+use List::MoreUtils qw(any);
 use LWP::UserAgent;
 use XML::LibXML;
 
@@ -28,10 +31,32 @@ my $xp_next  = XML::LibXML::XPathExpression->new('//div[@id="navigation" or @id=
 my $xp_set
   = XML::LibXML::XPathExpression->new('//div[@class="photoset"]/div/a');
 
+my @hash_cache;
 my $text_cache;
 
 sub stash_text {
 	($text_cache) = @_;
+}
+
+sub is_dup {
+	my ($newfile) = @_;
+	my $newhash = sha512(read_file($newfile));
+
+	if (@hash_cache) {
+		return any { $_ eq $newhash } @hash_cache;
+	}
+
+	for my $file (read_dir('.')) {
+		my $content = read_file($file);
+		my $hash = sha512($content);
+
+		push(@hash_cache, $hash);
+
+		if ($newhash eq $hash) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 sub crawl_image {
@@ -46,16 +71,16 @@ sub crawl_image {
 	}
 
 	say "downloading $name";
+	write_file($name, $ua->get($url)->content);
 
-	open( my $im, '>', $name ) or die("Cannot open $name: $!\n");
-	print {$im} $ua->get($url)->content;
-	close($im) or die("Cannot close $name: $!\n");
+	if (is_dup($name)) {
+		unlink($name);
+		say "no new images at $name (duplicate)";
+		exit 0;
+	}
 
 	if ($text_cache) {
-		open( my $txt, '>:encoding(utf-8)', "${id}.txt" )
-		  or die("Cannot open ${id}.txt: $!\n");
-		say {$txt} $text_cache;
-		close($txt) or die("cannot close ${id}.txt: $!\n");
+		write_file("${id}.txt", {binmode => ':utf8'}, $text_cache);
 		$text_cache = undef;
 	}
 }
