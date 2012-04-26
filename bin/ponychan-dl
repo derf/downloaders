@@ -1,0 +1,297 @@
+#!/usr/bin/env perl
+## Copyright © 2012 by Daniel Friesel <derf@derf.homelinux.org>
+## License: WTFPL <http://sam.zoy.org/wtfpl>
+use strict;
+use warnings;
+use 5.010;
+
+use Getopt::Std;
+use LWP::UserAgent;
+use String::Format;
+use XML::LibXML;
+
+my $basedir = "$ENV{HOME}/lib/pics/pony/chan";
+my $thread_url;
+my ( $server, $board, $thread );
+my %opts;
+my $number = 0;
+my ( $new_comm, $new_img, $all_comm, $all_img ) = ( 0, 0, 0, 0 );
+my $html;
+my @fred;
+local $| = 1;
+my $url_re = qr{
+	^ http:// www \. ponychan \. net / chan
+	/ (?<board> \w+ ) / res / (?<thread> \d+ ) \. html $
+}x;
+
+my $ua = LWP::UserAgent->new(
+	agent => 'Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.0.1 Iceweasel/7.0.1'
+);
+
+getopts( 'b:c:d:f:n:t:', \%opts );
+
+sub print_progress {
+	printf(
+		"\r\e[2KProcessing comment %d/%d (%d%%)",
+		$number, scalar @fred, $number * 100 / @fred,
+	);
+	return;
+}
+
+sub make_dirs {
+	foreach my $dir ( "$basedir/$board", "$basedir/$board/$thread" ) {
+		if ( not -d $dir ) {
+			mkdir($dir) or die("Cannot create directory $dir: $!");
+		}
+	}
+	return;
+}
+
+sub save_image {
+	my ( $img, $name ) = @_;
+	$all_img++;
+	if ( not -f "$basedir/$board/$thread/$name" ) {
+		$new_img++;
+		open( my $image, '>', "$basedir/$board/$thread/$name" )
+		  or die("Cannot open $name: $!");
+		print {$image} $ua->get($img)->content;
+		close($image) or die("Cannot close $name: $!");
+	}
+	return;
+}
+
+sub save_text {
+	my ( $fn, $text ) = @_;
+	$all_comm++;
+	if ( not -f "$basedir/$board/$thread/$fn" ) {
+		$new_comm++;
+		open( my $fh, '>', "$basedir/$board/$thread/$fn" )
+		  or die("Cannot open $fn: $!");
+		print {$fh} $text;
+		close($fh);
+	}
+	return;
+}
+
+$thread_url = shift;
+
+if ( $thread_url !~ $url_re ) {
+	die("Cannot parse url '$thread_url'");
+}
+
+$server = $+{server};
+$board  = $opts{b} // $+{board};
+$thread = $opts{n} // $+{thread};
+my $img_template     = $opts{f} // "%f";
+my $comment_template = $opts{c};
+my $text_template    = $opts{t} // "%t";
+
+if ( defined $opts{d} ) {
+	$basedir = $opts{d};
+}
+
+$html = XML::LibXML->load_html(
+	string            => $ua->get($thread_url)->content,
+	recover           => 2,
+	suppress_errors   => 1,
+	suppress_warnings => 1,
+);
+
+my $xp_thread = XML::LibXML::XPathExpression->new('//form[@id="delform"]/div');
+
+($html) = $html->findnodes($xp_thread);
+
+my $xp_op_img_link = XML::LibXML::XPathExpression->new('./span[@class="filesize"]/a');
+my $xp_op_img_name = XML::LibXML::XPathExpression->new('./span[@class="filesize"]/a');
+my $xp_op_text     = XML::LibXML::XPathExpression->new('./blockquote');
+
+my $xp_replies
+  = XML::LibXML::XPathExpression->new('//form[@id="delform"]/div/table/tbody/tr/td');
+
+my $xp_r_img_link
+  = XML::LibXML::XPathExpression->new('./span[@class="filesize"]/a');
+my $xp_r_img_name = $xp_op_img_name;
+my $xp_r_text     = $xp_op_text;
+
+push(
+	@fred,
+	[
+		( $html->findnodes($xp_op_img_link) )[0]->getAttribute('href'),
+		( $html->findnodes($xp_op_img_name) )[0]->textContent(),
+		( $html->findnodes($xp_op_text) )[0]->textContent(),
+	]
+);
+
+foreach my $element ( $html->findnodes($xp_replies) ) {
+	my $n_link = ( $element->findnodes($xp_r_img_link) )[0];
+	my $n_name = ( $element->findnodes($xp_r_img_name) )[0];
+	my $n_text = ( $element->findnodes($xp_r_text) )[0];
+	my ( $link, $name, $text );
+
+	next if ( not defined $n_text );
+
+	if ( defined $n_link ) {
+		$link = $n_link->getAttribute('href');
+	}
+	if ( defined $n_name ) {
+		$name = $n_name->textContent();
+	}
+	if ( defined $n_text ) {
+		$text = $n_text->textContent();
+	}
+	push( @fred, [ $link, $name, $text ] );
+}
+
+make_dirs();
+
+for my $i ( 0 .. $#fred ) {
+	my ( $url, $name, $text ) = @{ $fred[$i] };
+
+	$url //= q{};
+
+	my %format = (
+		'f' => ( split( qr{/}, $url ) )[-1] // q{},
+		'i' => sprintf( '%03d', $i ),
+		'n' => $name // q{},
+		't' => $text // q{},
+		'u' => $url  // q{},
+	);
+
+	$number++;
+	print_progress();
+	if ( length($url) ) {
+		save_image( $url, stringf( $img_template, %format ) );
+	}
+	if ( defined $comment_template ) {
+		save_text(
+			stringf( $comment_template, %format ),
+			stringf( $text_template,    %format ),
+		);
+	}
+}
+
+printf( "\r\e[2KDone: %d images in %d comments", $all_img, $number, );
+
+if (   ( $new_comm and $new_comm != $all_comm )
+	or ( $new_img and $new_img != $all_img ) )
+{
+	printf( " (%d/%d new)", $new_img, $new_comm, );
+}
+print "\n";
+
+__END__
+
+=head1 NAME
+
+4chan-dl - Download images from 4chan threads
+
+=head1 SYNOPSIS
+
+B<4chan-dl> [B<-b> I<board>] [B<-n> I<name>] I<thread_url>
+
+=head1 DESCRIPTION
+
+B<4chan-dl> Downloads all images in a thread (designated by I<thread_url>)
+from 4chan.
+They are saved in F<~/lib/pics/4chan/board/name>, where board and name
+can be overriden by commandline options
+
+=head1 OPTIONS
+
+=over
+
+=item B<-b> I<name>
+
+Save images in board I<name> instead of the board name they are from
+
+=item B<-c> I<comment template>
+
+Save thread comments to the filename specified by I<comment template>.  If
+this is not specified, comments will not be saved
+
+=item B<-d> I<directory>
+
+Change base directory
+
+=item B<-f> I<image template>
+
+Save images to the filename specified by I<image template>.  Default: B<%f>
+
+=item B<-n> I<name>
+
+Save images in the directory I<name> instead of the thread number
+
+=item B<-t> I<text template>
+
+Write text based on I<text template> into the comment files.  Default: B<%t>
+
+=back
+
+=head1 FORMAT SPECIFIERS
+
+The I<template> options accept a printf-like string with the following escape
+codes:
+
+=over
+
+=item B<%f>
+
+Image filename from 4chan, like "1276230223204.jpg"
+
+=item B<%i>
+
+B<4chan-dl> comment ID, starting at B<0>
+
+=item B<%n>
+
+Original image file name.  Note that this may not be unique, it is recommended
+to combine it with B<%i>
+
+=item B<%t>
+
+Full comment text
+
+=item B<%u>
+
+Full image URL
+
+=back
+
+Note that only B<%i> will be set for every comment, the other values may be
+empty if the comment contained either no file or no text.
+
+=head1 EXIT STATUS
+
+0 if the thread was found, non-zero upon any kind of error.
+
+=head1 CONFIGURATION
+
+None.
+
+=head1 DEPENDENCIES
+
+B<4chan-dl> requires the perl modules Getopt::Std, LWP::Simple, String::Format
+and XML::LibXML.
+
+=head1 BUGS AND LIMITATIONS
+
+None found so far.
+
+=head1 EXAMPLES
+
+=over
+
+=item * C<< 4chan-dl -d /tmp -c %f.txt $url >>
+
+Download images and comments to /tmp.  You could now use feh to browse images
+and their comments, like C<< feh -Sfilename --caption-path . /tmp/wg/... >>
+
+=back
+
+=head1 AUTHOR
+
+Copyright (C) 2008-2010 by Daniel Friesel <derf@chaosdorf.de>.
+
+=head1 LICENSE
+
+    0. You just DO WHAT THE FUCK YOU WANT TO.
