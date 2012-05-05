@@ -47,6 +47,9 @@ sub is_dup {
 	}
 
 	for my $file (read_dir('.')) {
+		if ($file eq $newfile) {
+			next;
+		}
 		my $content = read_file($file);
 		my $hash = sha512($content);
 
