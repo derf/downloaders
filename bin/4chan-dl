@@ -101,26 +101,14 @@ my $xp_thread = XML::LibXML::XPathExpression->new('//form[@name="delform"]');
 
 ($html) = $html->findnodes($xp_thread);
 
-my $xp_op_img_link = XML::LibXML::XPathExpression->new('./a');
-my $xp_op_img_name = XML::LibXML::XPathExpression->new('./span/span');
-my $xp_op_text     = XML::LibXML::XPathExpression->new('./blockquote');
-
 my $xp_replies
-  = XML::LibXML::XPathExpression->new('//form[@name="delform"]/table/tr/td');
+  = XML::LibXML::XPathExpression->new('//div[@class="post op" or @class="post reply"]');
 
 my $xp_r_img_link
-  = XML::LibXML::XPathExpression->new('./span[@class="filesize"]/a');
-my $xp_r_img_name = $xp_op_img_name;
-my $xp_r_text     = $xp_op_text;
-
-push(
-	@fred,
-	[
-		( $html->findnodes($xp_op_img_link) )[0]->getAttribute('href'),
-		( $html->findnodes($xp_op_img_name) )[0]->textContent(),
-		( $html->findnodes($xp_op_text) )[0]->textContent(),
-	]
-);
+  = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileInfo"]/span[@class="fileText"]/a');
+my $xp_r_img_name
+  = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileInfo"]/span[@class="fileText"]/span');
+my $xp_r_text     = XML::LibXML::XPathExpression->new('./blockquote');
 
 foreach my $element ( $html->findnodes($xp_replies) ) {
 	my $n_link = ( $element->findnodes($xp_r_img_link) )[0];
@@ -131,7 +119,7 @@ foreach my $element ( $html->findnodes($xp_replies) ) {
 	next if ( not defined $n_text );
 
 	if ( defined $n_link ) {
-		$link = $n_link->getAttribute('href');
+		$link = 'http:' . $n_link->getAttribute('href');
 	}
 	if ( defined $n_name ) {
 		$name = $n_name->textContent();
