@@ -1,0 +1,95 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use 5.010;
+
+use Getopt::Std;
+use LWP::UserAgent;
+use XML::LibXML;
+
+our $VERSION = '0.0';
+
+my $url = shift or die("Usage: $0 <url>\n");
+
+$url =~ s{ slide = \K \d+ }{1}x;
+
+my $ua = LWP::UserAgent->new;
+my ( $cur, $max ) = ( 1, 1 );
+
+my $xp_slides = XML::LibXML::XPathExpression->new('//span[@class="divider"]');
+my $xp_url    = XML::LibXML::XPathExpression->new(
+	'//div[@class="mediaContainer slideshowSlide"]/a/img');
+
+sub save_image {
+	my ($img) = @_;
+	my $name = ( split( qr{/}, $img ) )[-1];
+
+	open( my $image, '>', $name ) or die("Cannot open $name: $!\n");
+	print {$image} $ua->get($img)->content;
+	close($image) or die("Cannot close $name: $!\n");
+
+	return;
+}
+
+while ( $cur <= $max ) {
+	my $html = XML::LibXML->load_html(
+		string            => $ua->get($url)->content,
+		recover           => 2,
+		suppress_errors   => 1,
+		suppress_warnings => 1,
+	);
+	my $n_slides = ( $html->findnodes($xp_slides) )[0];
+	my $n_url    = ( $html->findnodes($xp_url) )[0];
+
+	my $progress = $n_slides->textContent;
+	my $im_url   = $n_url->getAttribute('src');
+	( $cur, $max ) = ( $progress =~ m{ (\d+) \s* of \s* (\d+) }ox );
+
+	$im_url =~ s{ \d+ [*] \d+ }{}ox;
+
+	printf( "%s: %s\n", $progress, $im_url );
+
+	save_image($im_url);
+
+	$cur++;
+	$url =~ s{ slide = \K \d+ }{$cur}x;
+}
+
+__END__
+
+=head1 NAME
+
+=head1 SYNOPSIS
+
+=head1 VERSION
+
+=head1 DESCRIPTION
+
+=head1 OPTIONS
+
+=over
+
+=back
+
+=head1 EXIT STATUS
+
+=head1 CONFIGURATION
+
+None.
+
+=head1 DEPENDENCIES
+
+=over
+
+=back
+
+=head1 BUGS AND LIMITATIONS
+
+=head1 AUTHOR
+
+Copyright (C) 2012 by Daniel Friesel E<lt>derf@finalrewind.orgE<gt>
+
+=head1 LICENSE
+
+  0. You just DO WHAT THE FUCK YOU WANT TO.
