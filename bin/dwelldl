@@ -25,6 +25,10 @@ sub save_image {
 	my ($img) = @_;
 	my $name = ( split( qr{/}, $img ) )[-1];
 
+	if ( -e $name ) {
+		return;
+	}
+
 	open( my $image, '>', $name ) or die("Cannot open $name: $!\n");
 	print {$image} $ua->get($img)->content;
 	close($image) or die("Cannot close $name: $!\n");
