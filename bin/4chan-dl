@@ -102,6 +102,10 @@ my $xp_thread = XML::LibXML::XPathExpression->new('//form[@name="delform"]');
 my $xp_replies
   = XML::LibXML::XPathExpression->new('//div[@class="post op" or @class="post reply"]');
 
+my $xp_r_author
+  = XML::LibXML::XPathExpression->new('./div[@class="postInfo desktop"]/span[@class="nameBlock"]/a/span[@class="name"]');
+my $xp_r_trip
+  = XML::LibXML::XPathExpression->new('./div[@class="postInfo desktop"]/span[@class="nameBlock"]/a/span[@class="postertrip"]');
 my $xp_r_img_link
   = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileInfo"]/span[@class="fileText"]/a');
 my $xp_r_img_name
@@ -109,39 +113,54 @@ my $xp_r_img_name
 my $xp_r_text     = XML::LibXML::XPathExpression->new('./blockquote');
 
 foreach my $element ( $html->findnodes($xp_replies) ) {
-	my $n_link = ( $element->findnodes($xp_r_img_link) )[0];
-	my $n_name = ( $element->findnodes($xp_r_img_name) )[0];
-	my $n_text = ( $element->findnodes($xp_r_text) )[0];
-	my ( $link, $name, $text );
+	my ($n_author) = $element->findnodes($xp_r_author);
+	my ($n_trip) = $element->findnodes($xp_r_trip);
+	my ($n_link) = $element->findnodes($xp_r_img_link);
+	my ($n_name) = $element->findnodes($xp_r_img_name);
+	my ($n_text) = $element->findnodes($xp_r_text);
+	my ( $author, $trip, $link, $name, $text );
 
 	next if ( not defined $n_text );
 
+	if ( defined $n_author) {
+		$author = $n_author->textContent;
+	}
+	if (defined $n_trip) {
+		$trip = $n_trip->textContent;
+	}
 	if ( defined $n_link ) {
 		$link = 'http:' . $n_link->getAttribute('href');
 	}
 	if ( defined $n_name ) {
-		$name = $n_name->textContent();
+		$name = $n_name->textContent;
 	}
 	if ( defined $n_text ) {
-		$text = $n_text->textContent();
+		$text = $n_text->textContent;
 	}
-	push( @fred, [ $link, $name, $text ] );
+	push( @fred, [ $author, $trip, $link, $name, $text ] );
 }
 
 make_dirs();
 
 for my $i ( 0 .. $#fred ) {
-	my ( $url, $name, $text ) = @{ $fred[$i] };
+	my ( $author, $trip, $url, $name, $text ) = @{ $fred[$i] };
 
 	$url //= q{};
 
 	my %format = (
+		'a' => $author // q{},
+		'A' => $author // q{},
+		'c' => $trip // q{},
 		'f' => ( split( qr{/}, $url ) )[-1] // q{},
 		'i' => sprintf( '%03d', $i ),
 		'n' => $name // q{},
 		't' => $text // q{},
 		'u' => $url  // q{},
 	);
+
+	if ($format{a} eq 'Anonymous') {
+		$format{a} = q{};
+	}
 
 	$number++;
 	print_progress();
@@ -219,6 +238,18 @@ The I<template> options accept a printf-like string with the following escape
 codes:
 
 =over
+
+=item B<%a>
+
+Poster name. Empty if "Anonymous"
+
+=item B<%A>
+
+Poster name, always set
+
+=item B<%c>
+
+Tripcode
 
 =item B<%f>
 
