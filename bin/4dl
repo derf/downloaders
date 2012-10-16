@@ -3,4 +3,4 @@
 ## License: WTFPL:
 ##   0. You just DO WHAT THE FUCK YOU WANT TO.
 
-while 4chan-dl "$1"; do sleep "${2-5}m"; done
+while 4chan-dl -f '%i_%a_%c_%n' "$1"; do sleep "${2-5}m"; done
