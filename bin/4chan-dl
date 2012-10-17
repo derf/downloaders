@@ -127,6 +127,7 @@ foreach my $element ( $html->findnodes($xp_replies) ) {
 	}
 	if (defined $n_trip) {
 		$trip = $n_trip->textContent;
+		$trip =~ tr{/}{_};
 	}
 	if ( defined $n_link ) {
 		$link = 'http:' . $n_link->getAttribute('href');
