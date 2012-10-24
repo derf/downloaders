@@ -124,6 +124,7 @@ foreach my $element ( $html->findnodes($xp_replies) ) {
 
 	if ( defined $n_author) {
 		$author = $n_author->textContent;
+		$author =~ tr{/}{_};
 	}
 	if (defined $n_trip) {
 		$trip = $n_trip->textContent;
