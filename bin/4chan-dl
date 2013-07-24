@@ -18,7 +18,7 @@ my $html;
 my @fred;
 local $| = 1;
 my $url_re = qr{
-	^ http:// boards \. 4chan \. org
+	^ https?:// boards \. 4chan \. org
 	/ (?<board> \w+ ) / res / (?<thread> \d+ ) $
 }x;
 
