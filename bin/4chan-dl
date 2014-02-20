@@ -107,9 +107,9 @@ my $xp_r_author
 my $xp_r_trip
   = XML::LibXML::XPathExpression->new('./div[@class="postInfo desktop"]/span[@class="nameBlock"]/a/span[@class="postertrip"]');
 my $xp_r_img_link
-  = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileInfo"]/span[@class="fileText"]/a');
+  = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileText"]/a');
 my $xp_r_img_name
-  = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileInfo"]/span[@class="fileText"]/span');
+  = XML::LibXML::XPathExpression->new('./div[@class="file"]/div[@class="fileText"]/span');
 my $xp_r_text     = XML::LibXML::XPathExpression->new('./blockquote');
 
 foreach my $element ( $html->findnodes($xp_replies) ) {
