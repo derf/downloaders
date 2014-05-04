@@ -19,7 +19,7 @@ my @fred;
 local $| = 1;
 my $url_re = qr{
 	^ https?:// boards \. 4chan \. org
-	/ (?<board> \w+ ) / res / (?<thread> \d+ ) $
+	/ (?<board> \w+ ) / thread / (?<thread> \d+ ) ( / .* )? $
 }x;
 
 my $ua = LWP::UserAgent->new(
